@@ -10,11 +10,19 @@ interface PersonCardProps {
   name: string;
   description: string;
   votes: number;
+  category: string;
   onVote: (id: number) => void;
   layout?: 'grid' | 'list';
 }
 
-const PersonCard = ({ id, name, description, votes, onVote, layout = 'grid' }: PersonCardProps) => {
+const categoryLabels: Record<string, string> = {
+  politica: "Política",
+  desporto: "Desporto",
+  entretenimento: "Entretenimento",
+  outro: "Outro"
+};
+
+const PersonCard = ({ id, name, description, votes, category, onVote, layout = 'grid' }: PersonCardProps) => {
   const [isVoting, setIsVoting] = useState(false);
 
   const handleVote = () => {
@@ -28,7 +36,10 @@ const PersonCard = ({ id, name, description, votes, onVote, layout = 'grid' }: P
       <Card className="person-card">
         <div className="flex items-center p-4 gap-4">
           <div className="flex-grow">
-            <h3 className="font-semibold text-lg">{name}</h3>
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="font-semibold text-lg">{name}</h3>
+              <Badge variant="outline">{categoryLabels[category]}</Badge>
+            </div>
             <p className="text-muted-foreground">{description}</p>
           </div>
           <div className="flex items-center gap-4">
@@ -55,8 +66,11 @@ const PersonCard = ({ id, name, description, votes, onVote, layout = 'grid' }: P
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="font-semibold text-lg">{name}</h3>
-            <Badge variant="secondary" className="mt-1">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="font-semibold text-lg">{name}</h3>
+              <Badge variant="outline">{categoryLabels[category]}</Badge>
+            </div>
+            <Badge variant="secondary">
               {votes} votos
             </Badge>
           </div>
