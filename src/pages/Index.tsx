@@ -37,7 +37,7 @@ const Index = () => {
   return <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl md:text-6xl">Os Mais Amados...</h1>
+          <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl md:text-6xl">Palacio da Vergonha</h1>
           <p className="mt-3 text-xl text-gray-500 sm:mt-4">
             Vote nas figuras mais controversas de Portugal
           </p>
