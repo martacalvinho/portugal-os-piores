@@ -1,6 +1,9 @@
 
 import { useState } from 'react';
 import PersonCard from '../components/PersonCard';
+import { LayoutGrid, List } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 
 interface Person {
   id: number;
@@ -32,6 +35,7 @@ const initialPeople: Person[] = [
 
 const Index = () => {
   const [people, setPeople] = useState<Person[]>(initialPeople);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   const handleVote = (id: number) => {
     setPeople(currentPeople =>
@@ -48,19 +52,42 @@ const Index = () => {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl md:text-6xl">
-            Portugal Mais Odiados
+            Personalidades Polémicas
           </h1>
           <p className="mt-3 text-xl text-gray-500 sm:mt-4">
-            Vote nas personalidades mais controversas de Portugal
+            Vote nas figuras mais controversas de Portugal
           </p>
         </div>
+
+        <div className="flex justify-end mb-6">
+          <ButtonGroup>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'outline'}
+              onClick={() => setViewMode('list')}
+              className="px-3"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'grid' ? 'default' : 'outline'}
+              onClick={() => setViewMode('grid')}
+              className="px-3"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </ButtonGroup>
+        </div>
         
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={viewMode === 'grid' 
+          ? "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          : "flex flex-col space-y-4"
+        }>
           {people.map(person => (
             <PersonCard
               key={person.id}
               {...person}
               onVote={handleVote}
+              layout={viewMode}
             />
           ))}
         </div>

@@ -11,9 +11,10 @@ interface PersonCardProps {
   description: string;
   votes: number;
   onVote: (id: number) => void;
+  layout?: 'grid' | 'list';
 }
 
-const PersonCard = ({ id, name, description, votes, onVote }: PersonCardProps) => {
+const PersonCard = ({ id, name, description, votes, onVote, layout = 'grid' }: PersonCardProps) => {
   const [isVoting, setIsVoting] = useState(false);
 
   const handleVote = () => {
@@ -21,6 +22,33 @@ const PersonCard = ({ id, name, description, votes, onVote }: PersonCardProps) =
     onVote(id);
     setTimeout(() => setIsVoting(false), 300);
   };
+
+  if (layout === 'list') {
+    return (
+      <Card className="person-card">
+        <div className="flex items-center p-4 gap-4">
+          <div className="flex-grow">
+            <h3 className="font-semibold text-lg">{name}</h3>
+            <p className="text-muted-foreground">{description}</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Badge variant="secondary">
+              {votes} votos
+            </Badge>
+            <Button 
+              onClick={handleVote}
+              variant="outline"
+              className="vote-button"
+              disabled={isVoting}
+            >
+              <ThumbsDown className="mr-2 h-4 w-4" />
+              Votar
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="person-card">
