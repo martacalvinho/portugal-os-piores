@@ -1,9 +1,12 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ThumbsDown } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 interface PersonCardProps {
   id: number;
@@ -24,11 +27,57 @@ const categoryLabels: Record<string, string> = {
 
 const PersonCard = ({ id, name, description, votes, category, onVote, layout = 'grid' }: PersonCardProps) => {
   const [isVoting, setIsVoting] = useState(false);
+  const queryClient = useQueryClient();
 
-  const handleVote = () => {
+  // Get or create browser fingerprint
+  const { data: fingerprint } = useQuery({
+    queryKey: ['fingerprint'],
+    queryFn: async () => {
+      const fp = await FingerprintJS.load();
+      const result = await fp.get();
+      return result.visitorId;
+    },
+    staleTime: Infinity, // Only compute once per session
+  });
+
+  // Get the user's vote status
+  const { data: voteStatus = false } = useQuery({
+    queryKey: ['voteStatus', id],
+    queryFn: async () => {
+      if (!fingerprint) return false;
+
+      const { data } = await supabase
+        .from('votes')
+        .select('*')
+        .eq('person_id', id)
+        .eq('browser_id', fingerprint)
+        .single();
+
+      const hasVoted = !!data;
+      console.log('Vote status for id:', id, 'is:', hasVoted);
+      return hasVoted;
+    },
+    refetchInterval: 5000, // Refetch every 5 seconds
+  });
+
+  const handleVote = async () => {
+    if (!fingerprint) return;
+    
     setIsVoting(true);
-    onVote(id);
-    setTimeout(() => setIsVoting(false), 300);
+    
+    // Optimistically update the UI
+    console.log('Setting vote status to true for id:', id);
+    queryClient.setQueryData(['voteStatus', id], true);
+    
+    try {
+      await onVote(id);
+      // The main query will be invalidated by the parent component
+      setTimeout(() => setIsVoting(false), 300);
+    } catch (error) {
+      // If the vote fails, revert the optimistic update
+      queryClient.setQueryData(['voteStatus', id], false);
+      setIsVoting(false);
+    }
   };
 
   if (layout === 'list') {
@@ -36,10 +85,8 @@ const PersonCard = ({ id, name, description, votes, category, onVote, layout = '
       <Card className="person-card">
         <div className="flex items-center p-4 gap-4">
           <div className="flex-grow">
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold text-lg">{name}</h3>
-              <Badge variant="outline">{categoryLabels[category]}</Badge>
-            </div>
+            <h3 className="font-semibold text-lg mb-1">{name}</h3>
+            <Badge variant="outline" className="mb-2">{categoryLabels[category]}</Badge>
             <p className="text-muted-foreground">{description}</p>
           </div>
           <div className="flex items-center gap-4">
@@ -48,7 +95,7 @@ const PersonCard = ({ id, name, description, votes, category, onVote, layout = '
             </Badge>
             <Button 
               onClick={handleVote}
-              variant="outline"
+              variant={voteStatus ? "default" : "outline"}
               className="vote-button"
               disabled={isVoting}
             >
@@ -66,10 +113,8 @@ const PersonCard = ({ id, name, description, votes, category, onVote, layout = '
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold text-lg">{name}</h3>
-              <Badge variant="outline">{categoryLabels[category]}</Badge>
-            </div>
+            <h3 className="font-semibold text-lg mb-1">{name}</h3>
+            <Badge variant="outline" className="mb-2">{categoryLabels[category]}</Badge>
             <Badge variant="secondary">
               {votes} votos
             </Badge>

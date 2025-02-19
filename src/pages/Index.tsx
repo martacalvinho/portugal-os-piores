@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PersonCard from '../components/PersonCard';
 import AddPersonModal from '../components/AddPersonModal';
 import { LayoutGrid, List, Search, Clock } from 'lucide-react';
@@ -33,41 +34,41 @@ const categories = [{
   label: "Outro"
 }];
 const Index = () => {
-  const [people, setPeople] = useState<Person[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("todos");
   const [showRecent, setShowRecent] = useState(false);
-  const {
-    toast
-  } = useToast();
-  useEffect(() => {
-    fetchPeople();
-  }, []);
-  const fetchPeople = async () => {
-    const {
-      data,
-      error
-    } = await supabase.from('people').select('*');
-    if (error) {
-      console.error('Error fetching people:', error);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: people = [] } = useQuery<Person[]>({
+    queryKey: ['people'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('people').select('*');
+      if (error) throw error;
+      return data || [];
+    },
+    refetchInterval: 5000, // Refetch every 5 seconds
+  });
+
+  const handleVote = async (id: number) => {
+    // Get browser fingerprint from query cache
+    const fingerprint = queryClient.getQueryData(['fingerprint']);
+    if (!fingerprint) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível registar o voto. Tente novamente.",
+        variant: "destructive"
+      });
       return;
     }
-    setPeople(data || []);
-  };
-  const handleVote = async (id: number) => {
-    // Get client IP for vote tracking
-    const response = await fetch('https://api.ipify.org?format=json');
-    const {
-      ip
-    } = await response.json();
 
     // Try to insert vote
     const {
       error: voteError
     } = await supabase.from('votes').insert([{
       person_id: id,
-      user_ip: ip
+      browser_id: fingerprint
     }]);
     if (voteError) {
       if (voteError.code === '23505') {
@@ -94,11 +95,8 @@ const Index = () => {
       return;
     }
 
-    // Update local state
-    setPeople(currentPeople => currentPeople.map(person => person.id === id ? {
-      ...person,
-      votes: person.votes + 1
-    } : person).sort((a, b) => b.votes - a.votes));
+    // Invalidate the query to trigger a refresh
+    queryClient.invalidateQueries({ queryKey: ['people'] });
     toast({
       title: "Voto registado",
       description: "O seu voto foi contabilizado com sucesso."
