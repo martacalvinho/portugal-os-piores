@@ -9,7 +9,62 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      people: {
+        Row: {
+          category: Database["public"]["Enums"]["person_category"]
+          created_at: string
+          description: string
+          id: number
+          name: string
+          votes: number | null
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["person_category"]
+          created_at?: string
+          description: string
+          id?: number
+          name: string
+          votes?: number | null
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["person_category"]
+          created_at?: string
+          description?: string
+          id?: number
+          name?: string
+          votes?: number | null
+        }
+        Relationships: []
+      }
+      votes: {
+        Row: {
+          created_at: string
+          id: number
+          person_id: number | null
+          user_ip: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          person_id?: number | null
+          user_ip: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          person_id?: number | null
+          user_ip?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "votes_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +73,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      person_category: "politica" | "desporto" | "entretenimento" | "outro"
     }
     CompositeTypes: {
       [_ in never]: never
