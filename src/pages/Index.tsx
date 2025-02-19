@@ -1,12 +1,14 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PersonCard from '../components/PersonCard';
 import AddPersonModal from '../components/AddPersonModal';
-import { LayoutGrid, List, Search } from 'lucide-react';
+import { LayoutGrid, List, Search, Clock } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Person {
   id: number;
@@ -14,31 +16,8 @@ interface Person {
   description: string;
   votes: number;
   category: string;
-  createdAt: Date;
+  created_at: string;
 }
-
-const initialPeople: Person[] = [{
-  id: 1,
-  name: "Fernando Santos",
-  description: "Ex-selecionador nacional que deixou Ronaldo no banco.",
-  votes: 45,
-  category: "desporto",
-  createdAt: new Date(2024, 1, 15)
-}, {
-  id: 2,
-  name: "Luís Filipe Vieira",
-  description: "Ex-presidente do Benfica envolvido em polémicas financeiras.",
-  votes: 67,
-  category: "desporto",
-  createdAt: new Date(2024, 1, 14)
-}, {
-  id: 3,
-  name: "Bruno de Carvalho",
-  description: "Ex-presidente do Sporting conhecido por gestão controversa.",
-  votes: 89,
-  category: "desporto",
-  createdAt: new Date(2024, 1, 13)
-}];
 
 const categories = [
   { value: "todos", label: "Todos" },
@@ -49,12 +28,65 @@ const categories = [
 ];
 
 const Index = () => {
-  const [people, setPeople] = useState<Person[]>(initialPeople);
+  const [people, setPeople] = useState<Person[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("todos");
+  const [showRecent, setShowRecent] = useState(false);
+  const { toast } = useToast();
 
-  const handleVote = (id: number) => {
+  useEffect(() => {
+    fetchPeople();
+  }, []);
+
+  const fetchPeople = async () => {
+    const { data, error } = await supabase
+      .from('people')
+      .select('*');
+    
+    if (error) {
+      console.error('Error fetching people:', error);
+      return;
+    }
+
+    setPeople(data || []);
+  };
+
+  const handleVote = async (id: number) => {
+    // Get client IP for vote tracking
+    const response = await fetch('https://api.ipify.org?format=json');
+    const { ip } = await response.json();
+
+    // Try to insert vote
+    const { error: voteError } = await supabase
+      .from('votes')
+      .insert([{ person_id: id, user_ip: ip }]);
+
+    if (voteError) {
+      if (voteError.code === '23505') { // Unique violation
+        toast({
+          title: "Já votou nesta pessoa",
+          description: "Apenas pode votar uma vez por pessoa.",
+          variant: "destructive"
+        });
+        return;
+      }
+      console.error('Error voting:', voteError);
+      return;
+    }
+
+    // Increment vote count
+    const { error: updateError } = await supabase
+      .from('people')
+      .update({ votes: people.find(p => p.id === id)?.votes! + 1 })
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('Error updating votes:', updateError);
+      return;
+    }
+
+    // Update local state
     setPeople(currentPeople =>
       currentPeople.map(person =>
         person.id === id
@@ -62,29 +94,49 @@ const Index = () => {
           : person
       ).sort((a, b) => b.votes - a.votes)
     );
+
+    toast({
+      title: "Voto registado",
+      description: "O seu voto foi contabilizado com sucesso."
+    });
   };
 
-  const handleAddPerson = ({ name, description, category }: { name: string; description: string; category: string }) => {
-    const newPerson: Person = {
-      id: Math.max(...people.map(p => p.id)) + 1,
-      name,
-      description,
-      votes: 0,
-      category,
-      createdAt: new Date()
-    };
-    setPeople(current => [...current, newPerson].sort((a, b) => b.votes - a.votes));
+  const handleAddPerson = async ({ name, description, category }: { name: string; description: string; category: string }) => {
+    const { data, error } = await supabase
+      .from('people')
+      .insert([{ name, description, category, votes: 0 }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding person:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível adicionar a pessoa.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setPeople(current => [...current, data].sort((a, b) => b.votes - a.votes));
+    toast({
+      title: "Sucesso",
+      description: "Pessoa adicionada com sucesso."
+    });
   };
 
-  const filteredPeople = people.filter(person => {
-    const matchesSearch = person.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "todos" || person.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  const recentPeople = [...people]
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    .slice(0, 3);
+  const filteredPeople = [...people]
+    .filter(person => {
+      const matchesSearch = person.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === "todos" || person.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      if (showRecent) {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      return b.votes - a.votes;
+    });
 
   return <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -94,17 +146,6 @@ const Index = () => {
             Vote nas figuras mais controversas de Portugal
           </p>
         </div>
-
-        {recentPeople.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-4">Adições Recentes</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {recentPeople.map(person => (
-                <PersonCard key={person.id} {...person} onVote={handleVote} layout="grid" />
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-4 flex-grow">
@@ -132,6 +173,14 @@ const Index = () => {
             </div>
           </div>
           <div className="flex gap-4 items-center">
+            <Button
+              variant={showRecent ? "default" : "outline"}
+              onClick={() => setShowRecent(!showRecent)}
+              className="gap-2"
+            >
+              <Clock className="h-4 w-4" />
+              Recentes
+            </Button>
             <AddPersonModal onAdd={handleAddPerson} />
             <ButtonGroup>
               <Button variant={viewMode === 'list' ? 'default' : 'outline'} onClick={() => setViewMode('list')} className="px-3">
